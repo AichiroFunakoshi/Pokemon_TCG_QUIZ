@@ -1,0 +1,83 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/*.log
+scrapers/*/logs/*.log
+
+# Data files (スクレイピング結果は含めるが、進捗ファイルは除外)
+data/progress.json
+data/scraped_ids.json
+
+# Backup files
+scrapers/*/backups/
+*.bak
+*.backup
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Card images (大容量のため除外)
+# card_data/images/*.jpg
+# card_data/card_details/*/image.jpg
+
+# Reference PDFs (著作権物のため除外)
+reference/*.pdf
+reference/*.rtf
+
+# macOS
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Test files
+test_*.py
+tests/__pycache__/
+.pytest_cache/
+.coverage
+htmlcov/
