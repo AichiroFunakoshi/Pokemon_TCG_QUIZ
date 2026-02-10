@@ -71,6 +71,16 @@ def fetch_with_retry(url: str, card_id: str) -> Optional[str]:
     logger.error(f"Failed to fetch {card_id} after {MAX_RETRIES} attempts")
     return None
 
+def sanitize_filename(filename: str) -> str:
+    """ファイル名から不正な文字を除去（セキュリティ対策）"""
+    import re
+    # ファイル名に使えない文字を削除: < > : " / \ | ? *
+    sanitized = re.sub(r'[<>:"/\\|?*]', '_', filename)
+    # 先頭・末尾の空白やピリオドを削除
+    sanitized = sanitized.strip('. ')
+    # 空の場合はデフォルト値
+    return sanitized if sanitized else 'unnamed'
+
 # ================================================================================
 # v35改善版：カード種判定ロジック
 # ================================================================================
@@ -325,8 +335,9 @@ def retry_failed_cards():
                 error_count += 1
                 continue
 
-            # フォルダとJSONを保存
-            card_folder = CARD_DETAILS_DIR / f"{card_id}_{card_data['name']}"
+            # フォルダとJSONを保存（ファイル名をサニタイズ）
+            safe_card_name = sanitize_filename(card_data['name'])
+            card_folder = CARD_DETAILS_DIR / f"{card_id}_{safe_card_name}"
             card_folder.mkdir(parents=True, exist_ok=True)
 
             json_file = card_folder / 'details.json'

@@ -13,11 +13,11 @@
     <meta name="apple-mobile-web-app-title" content="ポケカ検索">
 
     <!-- PWA Manifest -->
-    <link rel="manifest" href="/app/manifest.json">
+    <link rel="manifest" href="./manifest.json">
 
     <!-- Icons -->
-    <link rel="icon" type="image/png" sizes="192x192" href="/app/icons/icon-192x192.png">
-    <link rel="apple-touch-icon" href="/app/icons/icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="./icons/icon-192x192.png">
     <style>
         * {
             margin: 0;
@@ -281,7 +281,7 @@
             </div>
             <div class="search-stats" id="searchStats">
                 カードデータを読み込み中...
-            div>
+            </div>
         </div>
 
         <div id="cardsContainer">
@@ -324,6 +324,22 @@
             'fairy': '🧚',
             'colorless': '⚪'
         };
+
+        // ========================================================================
+        // セキュリティ: HTMLエスケープ関数（XSS対策）
+        // ========================================================================
+
+        function escapeHtml(unsafe) {
+            if (unsafe === null || unsafe === undefined) {
+                return '';
+            }
+            return String(unsafe)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
 
         // JSONデータを読み込み
         async function loadCards() {
@@ -377,23 +393,29 @@
 
             const cardsHTML = cards.map(card => {
                 const typeIcon = typeEmojis[card.type] || '⚪';
-                const imagePath = card.image_path || `../card_data/card_details/${card.id}_${card.name}/image.jpg`;
+                const cardId = escapeHtml(card.id);
+                const cardName = escapeHtml(card.name);
+                const imagePath = escapeHtml(card.image_path || `../card_data/card_details/${card.id}_${card.name}/image.jpg`);
+                const hp = escapeHtml(card.hp);
+                const type = escapeHtml(card.type);
+                const stage = escapeHtml(card.stage);
+                const cardNumber = escapeHtml(card.card_number || card.id);
 
                 return `
-                    <div class="card-item" onclick="showCardDetail('${card.id}')">
-                        <img src="${imagePath}" alt="${card.name}" class="card-image" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22280%22 height=%22380%22><rect width=%22280%22 height=%22380%22 fill=%22%23f0f0f0%22/><text x=%2250%25%22 y=%2250%25%22 font-family=%22Arial%22 font-size=%2220%22 fill=%22%23999%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22>画像なし</text></svg>'">
+                    <div class="card-item" onclick="showCardDetail('${cardId}')">
+                        <img src="${imagePath}" alt="${cardName}" class="card-image" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22280%22 height=%22380%22><rect width=%22280%22 height=%22380%22 fill=%22%23f0f0f0%22/><text x=%2250%25%22 y=%2250%25%22 font-family=%22Arial%22 font-size=%2220%22 fill=%22%23999%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22>画像なし</text></svg>'">
                         <div class="card-info">
                             <div class="card-name">
                                 <span class="type-icon">${typeIcon}</span>
-                                ${card.name}
+                                ${cardName}
                             </div>
                             <div class="card-details">
-                                ${card.hp ? `<span class="card-badge badge-hp">HP ${card.hp}</span>` : ''}
-                                ${card.type ? `<span class="card-badge badge-type">${card.type}</span>` : ''}
-                                ${card.stage ? `<span class="card-badge badge-stage">${card.stage}</span>` : ''}
+                                ${hp ? `<span class="card-badge badge-hp">HP ${hp}</span>` : ''}
+                                ${type ? `<span class="card-badge badge-type">${type}</span>` : ''}
+                                ${stage ? `<span class="card-badge badge-stage">${stage}</span>` : ''}
                             </div>
                             <div class="card-number">
-                                ${card.card_number || card.id}
+                                ${cardNumber}
                             </div>
                         </div>
                     </div>
@@ -409,43 +431,50 @@
             if (!card) return;
 
             const typeIcon = typeEmojis[card.type] || '⚪';
-            const imagePath = card.image_path || `../card_data/card_details/${card.id}_${card.name}/image.jpg`;
+            const imagePath = escapeHtml(card.image_path || `../card_data/card_details/${card.id}_${card.name}/image.jpg`);
+            const cardName = escapeHtml(card.name);
+            const cardNumber = escapeHtml(card.card_number || card.id);
+            const hp = escapeHtml(card.hp);
+            const type = escapeHtml(card.type);
+            const stage = escapeHtml(card.stage);
 
             let detailsHTML = `
-                <img src="${imagePath}" alt="${card.name}" class="modal-card-image">
-                <h2><span class="type-icon">${typeIcon}</span> ${card.name}</h2>
-                <p><strong>カード番号:</strong> ${card.card_number || card.id}</p>
-                ${card.hp ? `<p><strong>HP:</strong> ${card.hp}</p>` : ''}
-                ${card.type ? `<p><strong>タイプ:</strong> ${card.type}</p>` : ''}
-                ${card.stage ? `<p><strong>進化:</strong> ${card.stage}</p>` : ''}
+                <img src="${imagePath}" alt="${cardName}" class="modal-card-image">
+                <h2><span class="type-icon">${typeIcon}</span> ${cardName}</h2>
+                <p><strong>カード番号:</strong> ${cardNumber}</p>
+                ${hp ? `<p><strong>HP:</strong> ${hp}</p>` : ''}
+                ${type ? `<p><strong>タイプ:</strong> ${type}</p>` : ''}
+                ${stage ? `<p><strong>進化:</strong> ${stage}</p>` : ''}
             `;
 
             if (card.abilities && card.abilities.length > 0) {
                 detailsHTML += '<h3>特性・技</h3>';
                 card.abilities.forEach(ability => {
+                    const abilityName = escapeHtml(ability.name);
+                    const abilityDamage = escapeHtml(ability.damage || '');
                     detailsHTML += `
                         <div class="ability">
-                            <div class="ability-name">${ability.name}</div>
-                            <div>${ability.damage || ''}</div>
+                            <div class="ability-name">${abilityName}</div>
+                            <div>${abilityDamage}</div>
                         </div>
                     `;
                 });
             }
 
             if (card.description) {
-                detailsHTML += `<p><strong>説明:</strong> ${card.description}</p>`;
+                detailsHTML += `<p><strong>説明:</strong> ${escapeHtml(card.description)}</p>`;
             }
 
             if (card.weakness) {
-                detailsHTML += `<p><strong>弱点:</strong> ${card.weakness}</p>`;
+                detailsHTML += `<p><strong>弱点:</strong> ${escapeHtml(card.weakness)}</p>`;
             }
 
             if (card.resistance) {
-                detailsHTML += `<p><strong>抵抗力:</strong> ${card.resistance}</p>`;
+                detailsHTML += `<p><strong>抵抗力:</strong> ${escapeHtml(card.resistance)}</p>`;
             }
 
             if (card.illustrator) {
-                detailsHTML += `<p><strong>イラストレーター:</strong> ${card.illustrator}</p>`;
+                detailsHTML += `<p><strong>イラストレーター:</strong> ${escapeHtml(card.illustrator)}</p>`;
             }
 
             document.getElementById('modalBody').innerHTML = detailsHTML;
@@ -487,7 +516,7 @@
         // Service Workerをサポートしているか確認
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/app/service-worker.js')
+                navigator.serviceWorker.register('./service-worker.js')
                     .then((registration) => {
                         console.log('✓ Service Worker registered:', registration.scope);
 

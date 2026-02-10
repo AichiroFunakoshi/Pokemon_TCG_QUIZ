@@ -3,10 +3,10 @@ const RUNTIME_CACHE = 'pokemon-card-runtime-v1';
 
 // キャッシュするファイル（アプリシェル）
 const PRECACHE_URLS = [
-  '/app/index.html',
-  '/app/manifest.json',
-  '/app/icons/icon-192x192.png',
-  '/app/icons/icon-512x512.png'
+  './index.html',
+  './manifest.json',
+  './icons/icon-192x192.png',
+  './icons/icon-512x512.png'
 ];
 
 // インストール時：アプリシェルをキャッシュ
@@ -50,7 +50,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request)
         .catch(() => {
-          return caches.match('/app/index.html');
+          return caches.match('./index.html');
         })
     );
     return;
@@ -132,8 +132,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'ポケモンカード検索';
   const options = {
     body: data.body || '新しいカード情報が追加されました',
-    icon: '/app/icons/icon-192x192.png',
-    badge: '/app/icons/icon-72x72.png'
+    icon: './icons/icon-192x192.png',
+    badge: './icons/icon-72x72.png'
   };
 
   event.waitUntil(

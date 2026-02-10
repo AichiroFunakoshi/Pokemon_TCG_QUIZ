@@ -74,6 +74,17 @@ def fetch_with_retry(url: str, card_id: str) -> Optional[str]:
     return None
 
 
+def sanitize_filename(filename: str) -> str:
+    """ファイル名から不正な文字を除去（セキュリティ対策）"""
+    import re
+    # ファイル名に使えない文字を削除: < > : " / \ | ? *
+    sanitized = re.sub(r'[<>:"/\\|?*]', '_', filename)
+    # 先頭・末尾の空白やピリオドを削除
+    sanitized = sanitized.strip('. ')
+    # 空の場合はデフォルト値
+    return sanitized if sanitized else 'unnamed'
+
+
 def download_image(image_url: str, save_path: Path) -> bool:
     """画像をダウンロード"""
     try:
@@ -153,27 +164,35 @@ def parse_card_html(html_content: str, card_id: str) -> Optional[Dict[str, Any]]
 
 
 def load_progress() -> Dict[str, Any]:
-    """進捗データを読み込み"""
+    """進捗データを読み込み（パフォーマンス最適化：setに変換）"""
     if PROGRESS_FILE.exists():
         try:
             with open(PROGRESS_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                # リストをsetに変換（O(1)検索のため）
+                data['completed_cards'] = set(data.get('completed_cards', []))
+                data['failed_cards'] = set(data.get('failed_cards', []))
+                return data
         except Exception as e:
             logger.warning(f"Failed to load progress: {str(e)}")
 
     return {
         'last_card_id': CARD_ID_START - 1,
-        'completed_cards': [],
-        'failed_cards': []
+        'completed_cards': set(),
+        'failed_cards': set()
     }
 
 
 def save_progress(progress: Dict[str, Any]):
-    """進捗データを保存"""
+    """進捗データを保存（setをlistに変換）"""
     try:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
+        # setをlistに変換してJSON保存
+        progress_copy = progress.copy()
+        progress_copy['completed_cards'] = list(progress['completed_cards'])
+        progress_copy['failed_cards'] = list(progress['failed_cards'])
         with open(PROGRESS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(progress, f, ensure_ascii=False, indent=2)
+            json.dump(progress_copy, f, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.error(f"Failed to save progress: {str(e)}")
 
@@ -203,19 +222,20 @@ def scrape_all_cards():
             html_content = fetch_with_retry(url, card_id)
 
             if not html_content:
-                progress['failed_cards'].append(card_id)
+                progress['failed_cards'].add(card_id)
                 error_count += 1
                 continue
 
             card_data = parse_card_html(html_content, card_id)
 
             if not card_data or not card_data.get('name'):
-                progress['failed_cards'].append(card_id)
+                progress['failed_cards'].add(card_id)
                 error_count += 1
                 continue
 
-            # カードフォルダを作成
-            card_folder = CARD_DETAILS_DIR / f"{card_id}_{card_data['name']}"
+            # カードフォルダを作成（ファイル名をサニタイズ）
+            safe_card_name = sanitize_filename(card_data['name'])
+            card_folder = CARD_DETAILS_DIR / f"{card_id}_{safe_card_name}"
             card_folder.mkdir(parents=True, exist_ok=True)
 
             # JSONを保存
@@ -228,7 +248,7 @@ def scrape_all_cards():
                 image_path = card_folder / 'image.jpg'
                 download_image(card_data['image_url'], image_path)
 
-            progress['completed_cards'].append(card_id)
+            progress['completed_cards'].add(card_id)
             progress['last_card_id'] = card_id_int
             success_count += 1
 
@@ -243,7 +263,7 @@ def scrape_all_cards():
 
         except Exception as e:
             logger.error(f"Error processing {card_id}: {str(e)}")
-            progress['failed_cards'].append(card_id)
+            progress['failed_cards'].add(card_id)
             error_count += 1
 
     # 最終進捗を保存
