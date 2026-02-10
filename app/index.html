@@ -4,6 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ポケモンカード検索 / Pokemon Card Search</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="ポケモンカードゲーム XYレギュレーションのカード検索アプリ">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ポケカ検索">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/app/manifest.json">
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/app/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/app/icons/icon-192x192.png">
     <style>
         * {
             margin: 0;
@@ -465,6 +479,59 @@
 
         // ページ読み込み時にカードデータを取得
         loadCards();
+
+        // ========================================================================
+        // PWA - Service Worker Registration
+        // ========================================================================
+
+        // Service Workerをサポートしているか確認
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/app/service-worker.js')
+                    .then((registration) => {
+                        console.log('✓ Service Worker registered:', registration.scope);
+
+                        // 更新チェック
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            console.log('New Service Worker found');
+
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    // 新しいバージョンがあることをユーザーに通知
+                                    console.log('New version available! Please refresh.');
+                                }
+                            });
+                        });
+                    })
+                    .catch((error) => {
+                        console.error('Service Worker registration failed:', error);
+                    });
+            });
+        }
+
+        // ========================================================================
+        // PWA - Install Prompt
+        // ========================================================================
+
+        let deferredPrompt;
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // デフォルトのインストールプロンプトを防止
+            e.preventDefault();
+            deferredPrompt = e;
+
+            // インストールボタンを表示するなどの処理
+            console.log('PWA install prompt available');
+
+            // 将来的にカスタムインストールボタンを実装可能
+            // showInstallButton();
+        });
+
+        window.addEventListener('appinstalled', () => {
+            console.log('PWA installed successfully!');
+            deferredPrompt = null;
+        });
     </script>
 </body>
 </html>
