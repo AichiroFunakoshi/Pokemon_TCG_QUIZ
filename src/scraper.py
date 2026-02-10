@@ -31,7 +31,7 @@ from config import (
     BASE_URL, REGULATION, CARD_ID_START, CARD_ID_END,
     DELAY_PER_CARD, REQUEST_TIMEOUT, MAX_RETRIES, RETRY_DELAY,
     CARD_DETAILS_DIR, DATA_DIR, LOG_DIR, PROGRESS_FILE,
-    ENERGY_TYPE_MAP, PROGRESS_INTERVAL
+    ENERGY_TYPE_MAP, PROGRESS_INTERVAL, PROJECT_ROOT
 )
 
 
@@ -238,21 +238,28 @@ def scrape_all_cards():
             card_folder = CARD_DETAILS_DIR / f"{card_id}_{safe_card_name}"
             card_folder.mkdir(parents=True, exist_ok=True)
 
+            # 画像をダウンロード（ダウンロード失敗時はスキップ）
+            image_downloaded = False
+            if card_data['image_url']:
+                image_path = card_folder / 'image.jpg'
+                image_downloaded = download_image(card_data['image_url'], image_path)
+                if image_downloaded:
+                    # 相対パスを設定
+                    card_data['image_path'] = str(image_path.relative_to(PROJECT_ROOT))
+                else:
+                    logger.warning(f"Failed to download image for {card_id}")
+                    card_data['image_path'] = None
+
             # JSONを保存
             json_file = card_folder / 'details.json'
             with open(json_file, 'w', encoding='utf-8') as f:
                 json.dump(card_data, f, ensure_ascii=False, indent=2)
 
-            # 画像をダウンロード
-            if card_data['image_url']:
-                image_path = card_folder / 'image.jpg'
-                download_image(card_data['image_url'], image_path)
-
             progress['completed_cards'].add(card_id)
             progress['last_card_id'] = card_id_int
             success_count += 1
 
-            logger.info(f"✓ Scraped {card_id}: {card_data['name']}")
+            logger.info(f"✓ Scraped {card_id}: {card_data['name']} (image: {'OK' if image_downloaded else 'FAILED'})")
 
             # 定期的に進捗を保存
             if success_count % PROGRESS_INTERVAL == 0:

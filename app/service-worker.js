@@ -90,6 +90,10 @@ self.addEventListener('fetch', (event) => {
               cache.put(event.request, response.clone());
             }
             return response;
+          }).catch((error) => {
+            // フェッチ失敗時はエラーログを出力して空のレスポンスを返す
+            console.error('[Service Worker] Image fetch failed:', error);
+            return new Response('', { status: 404, statusText: 'Image not found' });
           });
         });
       })
