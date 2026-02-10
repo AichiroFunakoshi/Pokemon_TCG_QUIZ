@@ -17,6 +17,7 @@ XYレギュレーション全カードをスクレイピング
 
 import json
 import logging
+import re
 import sys
 import time
 from datetime import datetime
@@ -55,7 +56,8 @@ def setup_logging():
     return logging.getLogger(__name__)
 
 
-logger = setup_logging()
+# ロガーはmain()で初期化
+logger = None
 
 
 def fetch_with_retry(url: str, card_id: str) -> Optional[str]:
@@ -76,7 +78,6 @@ def fetch_with_retry(url: str, card_id: str) -> Optional[str]:
 
 def sanitize_filename(filename: str) -> str:
     """ファイル名から不正な文字を除去（セキュリティ対策）"""
-    import re
     # ファイル名に使えない文字を削除: < > : " / \ | ? *
     sanitized = re.sub(r'[<>:"/\\|?*]', '_', filename)
     # 先頭・末尾の空白やピリオドを削除
@@ -209,77 +210,79 @@ def scrape_all_cards():
     skip_count = 0
     error_count = 0
 
-    for card_id_int in range(CARD_ID_START, CARD_ID_END + 1):
-        card_id = str(card_id_int).zfill(6)
+    try:
+        for card_id_int in range(CARD_ID_START, CARD_ID_END + 1):
+            card_id = str(card_id_int).zfill(6)
 
-        # 既にスクレイピング済みの場合はスキップ
-        if card_id in progress['completed_cards']:
-            skip_count += 1
-            continue
-
-        try:
-            url = f"{BASE_URL}/{card_id}/regu/{REGULATION}"
-            html_content = fetch_with_retry(url, card_id)
-
-            if not html_content:
-                progress['failed_cards'].add(card_id)
-                error_count += 1
+            # 既にスクレイピング済みの場合はスキップ
+            if card_id in progress['completed_cards']:
+                skip_count += 1
                 continue
 
-            card_data = parse_card_html(html_content, card_id)
+            try:
+                url = f"{BASE_URL}/{card_id}/regu/{REGULATION}"
+                html_content = fetch_with_retry(url, card_id)
 
-            if not card_data or not card_data.get('name'):
+                if not html_content:
+                    progress['failed_cards'].add(card_id)
+                    error_count += 1
+                    continue
+
+                card_data = parse_card_html(html_content, card_id)
+
+                if not card_data or not card_data.get('name'):
+                    progress['failed_cards'].add(card_id)
+                    error_count += 1
+                    continue
+
+                # カードフォルダを作成（ファイル名をサニタイズ）
+                safe_card_name = sanitize_filename(card_data['name'])
+                card_folder = CARD_DETAILS_DIR / f"{card_id}_{safe_card_name}"
+                card_folder.mkdir(parents=True, exist_ok=True)
+
+                # 画像をダウンロード（ダウンロード失敗時はスキップ）
+                image_downloaded = False
+                if card_data['image_url']:
+                    image_path = card_folder / 'image.jpg'
+                    image_downloaded = download_image(card_data['image_url'], image_path)
+                    if image_downloaded:
+                        # 相対パスを設定（ValueError対策）
+                        try:
+                            card_data['image_path'] = str(image_path.relative_to(PROJECT_ROOT))
+                        except ValueError:
+                            # CARD_DETAILS_DIRがPROJECT_ROOT外の場合は絶対パス
+                            logger.warning(f"Cannot compute relative path for {card_id}, using absolute path")
+                            card_data['image_path'] = str(image_path)
+                    else:
+                        logger.warning(f"Failed to download image for {card_id}")
+                        card_data['image_path'] = None
+
+                # JSONを保存
+                json_file = card_folder / 'details.json'
+                with open(json_file, 'w', encoding='utf-8') as f:
+                    json.dump(card_data, f, ensure_ascii=False, indent=2)
+
+                progress['completed_cards'].add(card_id)
+                progress['last_card_id'] = card_id_int
+                success_count += 1
+
+                logger.info(f"✓ Scraped {card_id}: {card_data['name']} (image: {'OK' if image_downloaded else 'FAILED'})")
+
+                # 定期的に進捗を保存
+                if success_count % PROGRESS_INTERVAL == 0:
+                    save_progress(progress)
+                    logger.info(f"Progress: {success_count} cards completed")
+
+                time.sleep(DELAY_PER_CARD)
+
+            except Exception as e:
+                logger.error(f"Error processing {card_id}: {str(e)}")
                 progress['failed_cards'].add(card_id)
                 error_count += 1
-                continue
 
-            # カードフォルダを作成（ファイル名をサニタイズ）
-            safe_card_name = sanitize_filename(card_data['name'])
-            card_folder = CARD_DETAILS_DIR / f"{card_id}_{safe_card_name}"
-            card_folder.mkdir(parents=True, exist_ok=True)
-
-            # 画像をダウンロード（ダウンロード失敗時はスキップ）
-            image_downloaded = False
-            if card_data['image_url']:
-                image_path = card_folder / 'image.jpg'
-                image_downloaded = download_image(card_data['image_url'], image_path)
-                if image_downloaded:
-                    # 相対パスを設定（ValueError対策）
-                    try:
-                        card_data['image_path'] = str(image_path.relative_to(PROJECT_ROOT))
-                    except ValueError:
-                        # CARD_DETAILS_DIRがPROJECT_ROOT外の場合は絶対パス
-                        logger.warning(f"Cannot compute relative path for {card_id}, using absolute path")
-                        card_data['image_path'] = str(image_path)
-                else:
-                    logger.warning(f"Failed to download image for {card_id}")
-                    card_data['image_path'] = None
-
-            # JSONを保存
-            json_file = card_folder / 'details.json'
-            with open(json_file, 'w', encoding='utf-8') as f:
-                json.dump(card_data, f, ensure_ascii=False, indent=2)
-
-            progress['completed_cards'].add(card_id)
-            progress['last_card_id'] = card_id_int
-            success_count += 1
-
-            logger.info(f"✓ Scraped {card_id}: {card_data['name']} (image: {'OK' if image_downloaded else 'FAILED'})")
-
-            # 定期的に進捗を保存
-            if success_count % PROGRESS_INTERVAL == 0:
-                save_progress(progress)
-                logger.info(f"Progress: {success_count} cards completed")
-
-            time.sleep(DELAY_PER_CARD)
-
-        except Exception as e:
-            logger.error(f"Error processing {card_id}: {str(e)}")
-            progress['failed_cards'].add(card_id)
-            error_count += 1
-
-    # 最終進捗を保存
-    save_progress(progress)
+    finally:
+        # 中断時も必ず進捗を保存
+        save_progress(progress)
 
     logger.info("=" * 80)
     logger.info("✅ Scraping completed!")
@@ -289,6 +292,9 @@ def scrape_all_cards():
 
 def main():
     """メイン処理"""
+    global logger
+    logger = setup_logging()
+
     try:
         scrape_all_cards()
     except Exception as e:
