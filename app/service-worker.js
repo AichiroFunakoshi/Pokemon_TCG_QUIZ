@@ -62,8 +62,10 @@ self.addEventListener('fetch', (event) => {
       caches.open(RUNTIME_CACHE).then((cache) => {
         return fetch(event.request)
           .then((response) => {
-            // 成功したレスポンスをキャッシュに保存
-            cache.put(event.request, response.clone());
+            // 成功したレスポンス(200-299)のみキャッシュに保存
+            if (response.ok) {
+              cache.put(event.request, response.clone());
+            }
             return response;
           })
           .catch(() => {

@@ -244,8 +244,13 @@ def scrape_all_cards():
                 image_path = card_folder / 'image.jpg'
                 image_downloaded = download_image(card_data['image_url'], image_path)
                 if image_downloaded:
-                    # 相対パスを設定
-                    card_data['image_path'] = str(image_path.relative_to(PROJECT_ROOT))
+                    # 相対パスを設定（ValueError対策）
+                    try:
+                        card_data['image_path'] = str(image_path.relative_to(PROJECT_ROOT))
+                    except ValueError:
+                        # CARD_DETAILS_DIRがPROJECT_ROOT外の場合は絶対パス
+                        logger.warning(f"Cannot compute relative path for {card_id}, using absolute path")
+                        card_data['image_path'] = str(image_path)
                 else:
                     logger.warning(f"Failed to download image for {card_id}")
                     card_data['image_path'] = None
