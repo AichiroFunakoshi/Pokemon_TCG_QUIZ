@@ -283,11 +283,10 @@ def scrape_all_cards():
     finally:
         # 中断時も必ず進捗を保存
         save_progress(progress)
-
-    logger.info("=" * 80)
-    logger.info("✅ Scraping completed!")
-    logger.info(f"Success: {success_count}, Skipped: {skip_count}, Errors: {error_count}")
-    logger.info("=" * 80)
+        logger.info("=" * 80)
+        logger.info("✅ Scraping completed!")
+        logger.info(f"Success: {success_count}, Skipped: {skip_count}, Errors: {error_count}")
+        logger.info("=" * 80)
 
 
 def main():
