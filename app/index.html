@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ポケモンカード検索 / Pokemon Card Search</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="ポケモンカードゲーム XYレギュレーションのカード検索アプリ">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ポケカ検索">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="./manifest.json">
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="./icons/icon-192x192.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .search-box {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+
+        .search-input-wrapper {
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 15px 20px;
+            font-size: 1.1rem;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            transition: border-color 0.3s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .search-stats {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card-item {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+        }
+
+        .card-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .card-image {
+            width: 100%;
+            height: 380px;
+            object-fit: contain;
+            background: #f5f5f5;
+        }
+
+        .card-info {
+            padding: 15px;
+        }
+
+        .card-name {
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .card-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .card-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .badge-type {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .badge-hp {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .badge-stage {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .card-number {
+            color: #999;
+            font-size: 0.9rem;
+        }
+
+        .loading {
+            text-align: center;
+            color: white;
+            font-size: 1.2rem;
+            padding: 50px;
+        }
+
+        .no-results {
+            text-align: center;
+            color: white;
+            font-size: 1.3rem;
+            padding: 50px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+        }
+
+        .type-icon {
+            font-size: 1.2rem;
+            margin-right: 5px;
+        }
+
+        /* モーダル */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            overflow: auto;
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 50px auto;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 900px;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            font-size: 2rem;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .modal-card-image {
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto 20px;
+            display: block;
+        }
+
+        .modal-details {
+            line-height: 1.8;
+        }
+
+        .modal-details h3 {
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+
+        .ability, .move {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+
+        .ability-name, .move-name {
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .cards-grid {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            }
+
+            .modal-content {
+                margin: 20px;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎴 ポケモンカード検索</h1>
+            <p>Pokemon Card Search - XYレギュレーション</p>
+        </div>
+
+        <div class="search-box">
+            <div class="search-input-wrapper">
+                <input
+                    type="text"
+                    id="searchInput"
+                    class="search-input"
+                    placeholder="カード名を入力してください（例：ピカチュウ、オーベム）"
+                    autocomplete="off"
+                >
+            </div>
+            <div class="search-stats" id="searchStats">
+                カードデータを読み込み中...
+            </div>
+        </div>
+
+        <div id="cardsContainer">
+            <div class="loading">カードデータを読み込み中...</div>
+        </div>
+    </div>
+
+    <!-- カード詳細モーダル -->
+    <div id="cardModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script>
+        let allCards = [];
+        let filteredCards = [];
+
+        // タイプアイコンマップ
+        const typeEmojis = {
+            'normal': '⚪',
+            'fire': '🔥',
+            'water': '💧',
+            'lightning': '⚡',
+            'grass': '🌿',
+            'ice': '❄️',
+            'fighting': '👊',
+            'poison': '☠️',
+            'ground': '⛰️',
+            'flying': '🦅',
+            'psychic': '👁️',
+            'bug': '🐛',
+            'rock': '🪨',
+            'ghost': '👻',
+            'dragon': '🐉',
+            'darkness': '👿',
+            'dark': '👿',
+            'metal': '⚙️',
+            'fairy': '🧚',
+            'colorless': '⚪'
+        };
+
+        // ========================================================================
+        // セキュリティ: HTMLエスケープ関数（XSS対策）
+        // ========================================================================
+
+        function escapeHtml(unsafe) {
+            if (unsafe === null || unsafe === undefined) {
+                return '';
+            }
+            return String(unsafe)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // JSONデータを読み込み
+        async function loadCards() {
+            try {
+                const response = await fetch('../card_data/all_cards_local.json');
+                if (!response.ok) {
+                    throw new Error('カードデータの読み込みに失敗しました');
+                }
+                allCards = await response.json();
+                filteredCards = allCards;
+                updateStats();
+                renderCards(filteredCards);
+            } catch (error) {
+                console.error('Error loading cards:', error);
+                document.getElementById('cardsContainer').innerHTML =
+                    '<div class="no-results">カードデータが見つかりません。<br>all_cards_local.json を確認してください。</div>';
+                document.getElementById('searchStats').textContent = 'データ読み込みエラー';
+            }
+        }
+
+        // 検索フィルター
+        function filterCards(searchTerm) {
+            const term = searchTerm.toLowerCase().trim();
+
+            if (!term) {
+                filteredCards = allCards;
+            } else {
+                filteredCards = allCards.filter(card => {
+                    return card.name && card.name.toLowerCase().includes(term);
+                });
+            }
+
+            updateStats();
+            renderCards(filteredCards);
+        }
+
+        // 統計情報を更新
+        function updateStats() {
+            const stats = document.getElementById('searchStats');
+            stats.textContent = `全 ${allCards.length} 枚中 ${filteredCards.length} 枚を表示`;
+        }
+
+        // カード一覧を描画
+        function renderCards(cards) {
+            const container = document.getElementById('cardsContainer');
+
+            if (cards.length === 0) {
+                container.innerHTML = '<div class="no-results">検索結果が見つかりませんでした</div>';
+                return;
+            }
+
+            const cardsHTML = cards.map(card => {
+                const typeIcon = typeEmojis[card.type] || '⚪';
+                const cardId = escapeHtml(card.id);
+                const cardName = escapeHtml(card.name);
+                const imagePath = escapeHtml(card.image_path || `../card_data/card_details/${card.id}_${card.name}/image.jpg`);
+                const hp = escapeHtml(card.hp);
+                const type = escapeHtml(card.type);
+                const stage = escapeHtml(card.stage);
+                const cardNumber = escapeHtml(card.card_number || card.id);
+
+                return `
+                    <div class="card-item" data-card-id="${cardId}">
+                        <img src="${imagePath}" alt="${cardName}" class="card-image" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22280%22 height=%22380%22><rect width=%22280%22 height=%22380%22 fill=%22%23f0f0f0%22/><text x=%2250%25%22 y=%2250%25%22 font-family=%22Arial%22 font-size=%2220%22 fill=%22%23999%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22>画像なし</text></svg>'">
+                        <div class="card-info">
+                            <div class="card-name">
+                                <span class="type-icon">${typeIcon}</span>
+                                ${cardName}
+                            </div>
+                            <div class="card-details">
+                                ${hp ? `<span class="card-badge badge-hp">HP ${hp}</span>` : ''}
+                                ${type ? `<span class="card-badge badge-type">${type}</span>` : ''}
+                                ${stage ? `<span class="card-badge badge-stage">${stage}</span>` : ''}
+                            </div>
+                            <div class="card-number">
+                                ${cardNumber}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = `<div class="cards-grid">${cardsHTML}</div>`;
+
+            // イベント委譲でクリックイベントを安全に処理（XSS対策）
+            container.querySelectorAll('.card-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const cardId = item.getAttribute('data-card-id');
+                    if (cardId) {
+                        showCardDetail(cardId);
+                    }
+                });
+            });
+        }
+
+        // カード詳細を表示
+        function showCardDetail(cardId) {
+            const card = allCards.find(c => c.id === cardId);
+            if (!card) return;
+
+            const typeIcon = typeEmojis[card.type] || '⚪';
+            const imagePath = escapeHtml(card.image_path || `../card_data/card_details/${card.id}_${card.name}/image.jpg`);
+            const cardName = escapeHtml(card.name);
+            const cardNumber = escapeHtml(card.card_number || card.id);
+            const hp = escapeHtml(card.hp);
+            const type = escapeHtml(card.type);
+            const stage = escapeHtml(card.stage);
+
+            let detailsHTML = `
+                <img src="${imagePath}" alt="${cardName}" class="modal-card-image">
+                <h2><span class="type-icon">${typeIcon}</span> ${cardName}</h2>
+                <p><strong>カード番号:</strong> ${cardNumber}</p>
+                ${hp ? `<p><strong>HP:</strong> ${hp}</p>` : ''}
+                ${type ? `<p><strong>タイプ:</strong> ${type}</p>` : ''}
+                ${stage ? `<p><strong>進化:</strong> ${stage}</p>` : ''}
+            `;
+
+            if (card.abilities && card.abilities.length > 0) {
+                detailsHTML += '<h3>特性・技</h3>';
+                card.abilities.forEach(ability => {
+                    const abilityName = escapeHtml(ability.name);
+                    const abilityDamage = escapeHtml(ability.damage || '');
+                    detailsHTML += `
+                        <div class="ability">
+                            <div class="ability-name">${abilityName}</div>
+                            <div>${abilityDamage}</div>
+                        </div>
+                    `;
+                });
+            }
+
+            if (card.description) {
+                detailsHTML += `<p><strong>説明:</strong> ${escapeHtml(card.description)}</p>`;
+            }
+
+            if (card.weakness) {
+                detailsHTML += `<p><strong>弱点:</strong> ${escapeHtml(card.weakness)}</p>`;
+            }
+
+            if (card.resistance) {
+                detailsHTML += `<p><strong>抵抗力:</strong> ${escapeHtml(card.resistance)}</p>`;
+            }
+
+            if (card.illustrator) {
+                detailsHTML += `<p><strong>イラストレーター:</strong> ${escapeHtml(card.illustrator)}</p>`;
+            }
+
+            document.getElementById('modalBody').innerHTML = detailsHTML;
+            document.getElementById('cardModal').style.display = 'block';
+        }
+
+        // モーダルを閉じる
+        function closeModal() {
+            document.getElementById('cardModal').style.display = 'none';
+        }
+
+        // モーダル外クリックで閉じる
+        window.onclick = function(event) {
+            const modal = document.getElementById('cardModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+
+        // 検索入力イベント
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            filterCards(e.target.value);
+        });
+
+        // ESCキーでモーダルを閉じる
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+
+        // ページ読み込み時にカードデータを取得
+        loadCards();
+
+        // ========================================================================
+        // PWA - Service Worker Registration
+        // ========================================================================
+
+        // Service Workerをサポートしているか確認
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then((registration) => {
+                        console.log('✓ Service Worker registered:', registration.scope);
+
+                        // 更新チェック
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            console.log('New Service Worker found');
+
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    // 新しいバージョンがあることをユーザーに通知
+                                    console.log('New version available! Please refresh.');
+                                }
+                            });
+                        });
+                    })
+                    .catch((error) => {
+                        console.error('Service Worker registration failed:', error);
+                    });
+            });
+        }
+
+        // ========================================================================
+        // PWA - Install Prompt
+        // ========================================================================
+
+        let deferredPrompt;
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // デフォルトのインストールプロンプトを防止
+            e.preventDefault();
+            deferredPrompt = e;
+
+            // インストールボタンを表示するなどの処理
+            console.log('PWA install prompt available');
+
+            // 将来的にカスタムインストールボタンを実装可能
+            // showInstallButton();
+        });
+
+        window.addEventListener('appinstalled', () => {
+            console.log('PWA installed successfully!');
+            deferredPrompt = null;
+        });
+    </script>
+</body>
+</html>
