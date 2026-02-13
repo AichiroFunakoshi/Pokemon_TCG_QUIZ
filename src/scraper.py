@@ -67,7 +67,7 @@ def fetch_with_retry(url: str, card_id: str) -> Optional[str]:
             response = requests.get(url, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             return response.text
-        except Exception as e:
+        except requests.RequestException as e:
             logger.warning(f"Attempt {attempt+1} failed for {card_id}: {str(e)}")
             if attempt < MAX_RETRIES - 1:
                 time.sleep(RETRY_DELAY)
